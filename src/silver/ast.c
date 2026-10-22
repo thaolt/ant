@@ -2309,6 +2309,56 @@ static inline void import_decl_add_binding(
   sv_ast_list_push(JS, &decl->args, spec);
 }
 
+static inline bool import_attrs_here(P) {
+  uint8_t kw = NEXT();
+  if (LA() != TOK_LBRACE) return false;
+  if (kw == TOK_WITH) return true;
+  return
+    kw == TOK_IDENTIFIER && !HAD_NEWLINE &&
+    TLEN == 6 && memcmp(tok_str(p), "assert", 6) == 0;
+}
+
+static sv_ast_t *parse_import_attrs(P) {
+  CONSUME();
+  expect(p, TOK_LBRACE);
+
+  sv_ast_t *attrs = mk(N_OBJECT);
+  while (NEXT() != TOK_RBRACE && TOK != TOK_EOF) {
+    sv_ast_t *prop = mk(N_PROPERTY);
+
+    if (TOK == TOK_STRING) {
+      prop->left = mk(N_STRING);
+      sv_ast_set_string(prop->left, sv_lexer_str_literal(&p->lx));
+      prop->left->src_end = (uint32_t)(TOFF + TLEN);
+    } else if (is_private_ident_like_tok(TOK)) {
+      prop->left = mk_ident_from_tok(p);
+    } else {
+      sv_parse_unexpected_token(p);
+      return attrs;
+    }
+    CONSUME();
+
+    expect(p, TOK_COLON);
+    if (NEXT() != TOK_STRING) {
+      sv_parse_unexpected_token(p);
+      return attrs;
+    }
+    prop->right = mk(N_STRING);
+    sv_ast_set_string(prop->right, sv_lexer_str_literal(&p->lx));
+    prop->right->src_end = (uint32_t)(TOFF + TLEN);
+    CONSUME();
+
+    sv_ast_list_push(JS, &attrs->args, prop);
+    if (NEXT() == TOK_COMMA) {
+      CONSUME();
+      if (NEXT() == TOK_RBRACE) break;
+    } else break;
+  }
+
+  expect(p, TOK_RBRACE);
+  return attrs;
+}
+
 static sv_ast_t *parse_import_stmt(P) {
   static const char default_name[] = "default";
   sv_ast_t *decl = mk(N_IMPORT_DECL);
@@ -2318,6 +2368,7 @@ static sv_ast_t *parse_import_stmt(P) {
     sv_ast_set_string(spec, sv_lexer_str_literal(&p->lx));
     spec->src_end = (uint32_t)(TOFF + TLEN);
     CONSUME();
+    if (import_attrs_here(p)) decl->cond = parse_import_attrs(p);
     consume_semicolon(p);
     decl->right = spec;
     return decl;
@@ -2406,6 +2457,7 @@ parse_from:
   spec->src_end = (uint32_t)(TOFF + TLEN);
   CONSUME();
   decl->right = spec;
+  if (import_attrs_here(p)) decl->cond = parse_import_attrs(p);
 
   consume_semicolon(p);
   return decl;
@@ -2554,6 +2606,7 @@ static sv_ast_t *parse_export_stmt(P) {
       decl->right = spec;
       decl->flags |= EX_FROM;
       CONSUME();
+      if (import_attrs_here(p)) decl->cond = parse_import_attrs(p);
     }
 
     consume_semicolon(p);
@@ -2587,6 +2640,7 @@ static sv_ast_t *parse_export_stmt(P) {
     decl->right = spec;
     decl->flags |= EX_FROM;
     CONSUME();
+    if (import_attrs_here(p)) decl->cond = parse_import_attrs(p);
 
     consume_semicolon(p);
     return decl;
