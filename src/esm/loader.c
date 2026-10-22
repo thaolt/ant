@@ -1950,16 +1950,41 @@ ant_value_t js_esm_load_node_builtin(ant_t *js, const char *specifier, size_t sp
     : esm_load_builtin(js, specifier, builtin);
 }
 
+static ant_value_t esm_import_attrs_value(ant_t *js, const sv_ast_t *attrs) {
+  if (!attrs || attrs->type != N_OBJECT) return js_mkundef();
+
+  GC_ROOT_SAVE(root_mark, js);
+  ant_value_t obj = Ant_Object_CreateBare(js);
+  GC_ROOT_PIN(js, obj);
+
+  for (int i = 0; i < attrs->args.count; i++) {
+    const sv_ast_t *prop = attrs->args.items[i];
+    if (!prop || prop->type != N_PROPERTY) continue;
+    const sv_ast_t *key = prop->left;
+    const sv_ast_t *val = prop->right;
+    if (!key || !key->str || !val || val->type != N_STRING || !val->str) continue;
+    js_mkprop_fast(js, obj, key->str, key->len, js_mkstr(js, val->str, val->len));
+  }
+
+  GC_ROOT_RESTORE(js, root_mark);
+  return obj;
+}
+
 static ant_value_t esm_load_static_dependency(
   ant_t *js,
   esm_module_t *parent,
-  sv_ast_t *spec
+  sv_ast_t *spec,
+  const sv_ast_t *attrs_node
 ) {
   if (!spec || spec->type != N_STRING || !spec->str) return js_mkundef();
 
   if (esm_hooks_present(js)) {
+    GC_ROOT_SAVE(root_mark, js);
+    ant_value_t attrs = esm_import_attrs_value(js, attrs_node);
+    GC_ROOT_PIN(js, attrs);
     bool handled = false;
-    ant_value_t ns = esm_import_via_hooks(js, spec->str, spec->len, parent->resolved_path, js_mkundef(), false, &handled);
+    ant_value_t ns = esm_import_via_hooks(js, spec->str, spec->len, parent->resolved_path, attrs, false, &handled);
+    GC_ROOT_RESTORE(js, root_mark);
     if (handled) return ns;
   }
 
@@ -2029,10 +2054,11 @@ static ant_value_t esm_instantiate_static_dependencies(
   esm_predeclare_exports(js, program, ns);
 
   for (int i = 0; i < program->args.count; i++) {
+    sv_ast_t *stmt = program->args.items[i];
     sv_ast_t *spec = NULL;
-    if (!esm_static_dependency_specifier(program->args.items[i], &spec)) continue;
+    if (!esm_static_dependency_specifier(stmt, &spec)) continue;
 
-    ant_value_t dep = esm_load_static_dependency(js, mod, spec);
+    ant_value_t dep = esm_load_static_dependency(js, mod, spec, stmt->cond);
     if (is_err(dep)) return dep;
   }
 
@@ -2556,6 +2582,10 @@ ant_value_t js_esm_import_sync_from_require(ant_t *js, ant_value_t specifier, co
 
 ant_value_t js_esm_import_sync(ant_t *js, ant_value_t specifier) {
   return js_esm_import_sync_from(js, specifier, NULL);
+}
+
+ant_value_t js_esm_import_sync_attrs(ant_t *js, ant_value_t specifier, ant_value_t attrs) {
+  return esm_import_from_attrs(js, specifier, NULL, attrs);
 }
 
 ant_value_t js_esm_import_dynamic(ant_t *js, ant_value_t specifier, const char *base_path, ant_value_t *out_tla_promise) {

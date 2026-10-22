@@ -3256,6 +3256,7 @@ ant_value_t sv_execute_frame(sv_vm_t *vm, sv_func_t *func, ant_value_t this, ant
 
   L_IMPORT:          { VM_CHECK(sv_op_import(vm, js, func));            NEXT(OP_IMPORT); }
   L_IMPORT_SYNC:     { VM_CHECK(sv_op_import_sync(vm, js));             NEXT(OP_IMPORT_SYNC); }
+  L_IMPORT_SYNC_ATTRS: { VM_CHECK(sv_op_import_sync_attrs(vm, js));     NEXT(OP_IMPORT_SYNC_ATTRS); }
   L_IMPORT_DEFAULT:  { sv_op_import_default(vm, js);                    NEXT(OP_IMPORT_DEFAULT); }
   L_IMPORT_NAMED:    { VM_CHECK(sv_op_import_named(vm, js, func, ip));  NEXT(OP_IMPORT_NAMED); }
   L_EXPORT:          { VM_CHECK(sv_op_export(vm, js, frame, func, ip)); NEXT(OP_EXPORT); }

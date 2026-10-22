@@ -144,6 +144,14 @@ static inline ant_value_t sv_op_import_sync(sv_vm_t *vm, ant_t *js) {
   return result;
 }
 
+static inline ant_value_t sv_op_import_sync_attrs(sv_vm_t *vm, ant_t *js) {
+  ant_value_t attrs = vm->stack[--vm->sp];
+  ant_value_t specifier = vm->stack[--vm->sp];
+  ant_value_t result = js_esm_import_sync_attrs(js, specifier, attrs);
+  if (!is_err(result)) vm->stack[vm->sp++] = result;
+  return result;
+}
+
 static inline ant_value_t sv_import_default_value(ant_value_t ns) {
   if (vtype(ns) == kTypeObject) {
     ant_value_t slot_val = js_get_slot(ns, SLOT_DEFAULT);
