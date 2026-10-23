@@ -38,21 +38,24 @@ ENV CC=clang CXX=clang++ CC_LD=lld AR=llvm-ar RANLIB=llvm-ranlib CMAKE_AR=llvm-a
 RUN --mount=type=cache,id=ant-musl-build-${TARGETARCH},target=/work/build,sharing=locked \
     --mount=type=cache,id=ant-musl-temporal-${TARGETARCH},target=/work/.cache/temporal-rust,sharing=locked <<EOF
 set -eux
-meson setup build                          \
+RECONFIGURE=""
+[ -f build/build.ninja ] && RECONFIGURE="--reconfigure"
+meson setup $RECONFIGURE build             \
   -Db_lto=true                             \
   --buildtype=release                      \
   -Dbuild_timestamp="${BUILD_TIMESTAMP:-}" \
   -Dbuild_git_hash="${BUILD_GIT_HASH:-}"   \
   --prefer-static                          \
-  -Dstatic_link=true
+  -Dstatic_link=true                       \
+  -Druntime_binary=enabled
 meson compile -C build
 mkdir -p /out
-llvm-strip --strip-unneeded build/ant
-cp build/ant /out/ant
+llvm-strip --strip-unneeded build/ant build/ant-runtime
+cp build/ant build/ant-runtime /out/
 EOF
 
 FROM scratch AS export
-COPY --from=build /out/ant /ant
+COPY --from=build /out/ant /out/ant-runtime /
 
 FROM toolchain AS runtime-files
 RUN <<EOF
