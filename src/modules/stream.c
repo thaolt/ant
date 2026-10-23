@@ -1963,6 +1963,11 @@ static ant_value_t stream_finished_on_error(ant_params_t) {
   return stream_finished_fire(js, js_get_slot(js_getcurrentfunc(js), SLOT_DATA), nargs > 0 ? args[0] : js_mkundef());
 }
 
+static ant_value_t stream_finished_cleanup_fn(ant_params_t) {
+  stream_finished_cleanup(js, js_get_slot(js_getcurrentfunc(js), SLOT_DATA));
+  return js_mkundef();
+}
+
 static ant_value_t stream_finished_register(ant_t *js, ant_value_t stream_obj, ant_value_t callback) {
   if (!is_callable(callback)) callback = Ant_Function_Create(stream_noop);
 
@@ -1980,11 +1985,12 @@ static ant_value_t stream_finished_register(ant_t *js, ant_value_t stream_obj, a
   }
   
   ant_value_t added = stream_add_listener(js, stream_obj, "error", on_error, false);
-  return is_err(added) ? added : stream_obj;
+  return is_err(added) ? added : js_heavy_mkfun(js, stream_finished_cleanup_fn, state);
 }
 
 static ant_value_t js_stream_finished(ant_params_t) {
   ant_value_t callback = nargs > 1 ? args[1] : js_mkundef();
+  if (nargs > 2 && !is_callable(callback)) callback = args[2];
   if (nargs < 1 || !is_object_type(args[0])) return js_mkerr(js, "finished requires a stream");
   return stream_finished_register(js, args[0], callback);
 }
