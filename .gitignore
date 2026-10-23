@@ -19,6 +19,7 @@
 /result-*
 /todo/*
 /docs/private
+/dist
 
 /differential-output
 /node-compat-output
