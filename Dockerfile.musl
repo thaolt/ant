@@ -55,16 +55,19 @@ meson setup build                          \
   -Dbuild_git_hash="${BUILD_GIT_HASH:-}"   \
   -Dsandbox="$SANDBOX"                     \
   --prefer-static                          \
+  -Druntime_binary=enabled                 \
   -Dstatic_link=true
 echo "$stamp" > build/.toolchain
 meson compile -C build
 mkdir -p /out
-llvm-strip --strip-unneeded build/ant
+llvm-strip --strip-unneeded build/ant build/ant-runtime
 cp build/ant /out/ant
+cp build/ant-runtime /out/ant-runtime
 EOF
 
 FROM scratch AS export
 COPY --from=build /out/ant /ant
+COPY --from=build /out/ant-runtime /ant-runtime
 COPY --from=toolchain /etc/ssl/certs/ca-certificates.crt /ca-certificates.crt
 
 FROM toolchain AS runtime-files
