@@ -3204,6 +3204,11 @@ static ant_value_t stream_finished_on_error(ant_params_t) {
   return stream_finished_fire(js, stream_op_current(js, call_func), nargs > 0 ? args[0] : Ant_Value_Undefined);
 }
 
+static ant_value_t stream_finished_cleanup_fn(ant_params_t) {
+  stream_finished_cleanup(js, &stream_op_current(js, call_func)->finished);
+  return Ant_Value_Undefined;
+}
+
 static ant_value_t stream_finished_register(
   ant_t *js, ant_value_t stream_obj, ant_value_t callback,
   bool readable, bool writable
@@ -3235,7 +3240,7 @@ static ant_value_t stream_finished_register(
     if (is_err(added)) return added;
   }
 
-  return stream_obj;
+  return js_heavy_mkfun(js, stream_finished_cleanup_fn, state);
 }
 
 static ant_value_t js_stream_finished(ant_params_t) {
